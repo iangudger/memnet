@@ -598,20 +598,13 @@ var _ net.Listener = (*BufferedListener)(nil)
 //
 // Supported networks: "unix", "unixpacket".
 func BufferedListen(network string, addr *net.UnixAddr) (*BufferedListener, error) {
-	var (
-		ep             unix.Endpoint
-		connectionless bool
-	)
+	var ep unix.Endpoint
+
 	switch network {
 	case "unix":
 		ep = unix.NewConnectioned(nil /* ctx */, linux.SOCK_STREAM, &uniqueIDProvider)
 	case "unixpacket":
 		ep = unix.NewConnectioned(nil /* ctx */, linux.SOCK_SEQPACKET, &uniqueIDProvider)
-	case "unixgram":
-		//ep = unix.NewConnectionless(nil /* ctx */)
-		//connectionless = true
-		// Disabled for now.
-		fallthrough
 	default:
 		return nil, &net.OpError{Op: "listen", Net: network, Source: addr, Err: net.UnknownNetworkError(network)}
 	}
@@ -623,10 +616,8 @@ func BufferedListen(network string, addr *net.UnixAddr) (*BufferedListener, erro
 		}
 	}
 
-	if !connectionless {
-		if err := ep.Listen(10 /* backlog */); err != nil {
-			return nil, &net.OpError{Op: "listen", Net: network, Source: addr, Err: errors.New(err.String())}
-		}
+	if err := ep.Listen(10 /* backlog */); err != nil {
+		return nil, &net.OpError{Op: "listen", Net: network, Source: addr, Err: errors.New(err.String())}
 	}
 
 	return &BufferedListener{ep, network, make(chan struct{})}, nil
@@ -715,18 +706,13 @@ func (l *BufferedListener) Dial(laddr *net.UnixAddr) (net.Conn, error) {
 // DialContext creates a new net.Conn connected to the listener and optionally
 // bound to laddr with the option of adding cancellation and timeouts.
 func (l *BufferedListener) DialContext(ctx context.Context, laddr *net.UnixAddr) (net.Conn, error) {
-	var (
-		ep unix.Endpoint
-	)
+	var ep unix.Endpoint
+
 	switch l.network {
 	case "unix":
 		ep = unix.NewConnectioned(nil /* ctx */, linux.SOCK_STREAM, &uniqueIDProvider)
 	case "unixpacket":
 		ep = unix.NewConnectioned(nil /* ctx */, linux.SOCK_SEQPACKET, &uniqueIDProvider)
-	case "unixgram":
-		//ep = unix.NewConnectionless(nil /* ctx */)
-		// Disabled for now.
-		fallthrough
 	default:
 		return nil, &net.OpError{Op: "dial", Net: l.network, Source: laddr, Addr: l.Addr(), Err: net.UnknownNetworkError(l.network)}
 	}
