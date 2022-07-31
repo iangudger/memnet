@@ -601,6 +601,10 @@ var _ net.Listener = (*BufferedListener)(nil)
 func BufferedListen(network string, addr *net.UnixAddr) (*BufferedListener, error) {
 	var ep unix.Endpoint
 
+	if addr == nil {
+		return nil, &net.OpError{Op: "listen", Net: network, Err: net.InvalidAddrError("nil")}
+	}
+
 	switch network {
 	case "unix":
 		ep = unix.NewConnectioned(nil /* ctx */, linux.SOCK_STREAM, &uniqueIDProvider)
@@ -610,11 +614,9 @@ func BufferedListen(network string, addr *net.UnixAddr) (*BufferedListener, erro
 		return nil, &net.OpError{Op: "listen", Net: network, Source: addr, Err: net.UnknownNetworkError(network)}
 	}
 
-	if addr != nil {
-		if err := ep.Bind(tcpip.FullAddress{Addr: tcpip.Address(addr.Name)}, nil /* commit */); err != nil {
-			ep.Close(nil /* ctx */)
-			return nil, &net.OpError{Op: "bind", Net: network, Source: addr, Err: errors.New(err.String())}
-		}
+	if err := ep.Bind(tcpip.FullAddress{Addr: tcpip.Address(addr.Name)}, nil /* commit */); err != nil {
+		ep.Close(nil /* ctx */)
+		return nil, &net.OpError{Op: "bind", Net: network, Source: addr, Err: errors.New(err.String())}
 	}
 
 	if err := ep.Listen(10 /* backlog */); err != nil {
