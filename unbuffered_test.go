@@ -1,4 +1,4 @@
-// Copyright 2018 The gVisor Authors.
+// Copyright 2022 The gVisor Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,77 +22,16 @@ import (
 	"net/http"
 	"testing"
 
-	"golang.org/x/net/nettest"
 	"golang.org/x/sync/errgroup"
 )
 
-func TestNewBufferedPairConformance(t *testing.T) {
-	for _, network := range []string{"unix", "unixgram", "unixpacket"} {
-		t.Run(network, func(t *testing.T) {
-			nettest.TestConn(t, func() (c1, c2 net.Conn, stop func(), err error) {
-				c1, c2, err = NewBufferedPair(network)
-				if err != nil {
-					return nil, nil, nil, err
-				}
-				stop = func() {
-					c1.Close()
-					c2.Close()
-				}
-				return
-			})
-		})
-	}
-}
-
-func TestBufferedListenConformance(t *testing.T) {
-	for _, network := range []string{"unix", "unixpacket"} {
-		t.Run(network, func(t *testing.T) {
-			nettest.TestConn(t, func() (c1, c2 net.Conn, stop func(), err error) {
-				l, err := BufferedListen(network, &net.UnixAddr{
-					Name: "test",
-					Net:  network,
-				})
-				if err != nil {
-					return nil, nil, nil, fmt.Errorf("BufferedListen: %w", err)
-				}
-
-				c1, err = l.Dial(nil)
-				if err != nil {
-					l.Close()
-					return nil, nil, nil, fmt.Errorf("DialTCP: %w", err)
-				}
-
-				c2, err = l.Accept()
-				if err != nil {
-					c1.Close()
-					l.Close()
-					return nil, nil, nil, fmt.Errorf("Accept: %w", err)
-				}
-
-				stop = func() {
-					c1.Close()
-					c2.Close()
-					l.Close()
-				}
-				return
-			})
-		})
-	}
-}
-
-func TestBufferedListener_netHTTP(t *testing.T) {
+func TestUnbuffered_netHTTP(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	const want = "hello world"
 
-	l, err := BufferedListen("unix", &net.UnixAddr{
-		Name: "test",
-		Net:  "unix",
-	})
-	if err != nil {
-		t.Fatal("BufferedListen:", err)
-	}
+	l := NewUnbuffered()
 
 	server := http.Server{Handler: http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if _, err := writer.Write([]byte(want)); err != nil {
@@ -108,7 +47,7 @@ func TestBufferedListener_netHTTP(t *testing.T) {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.Proxy = nil
 	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
-		return l.DialContext(ctx, nil)
+		return l.DialContext(ctx)
 	}
 	client := http.Client{Transport: transport}
 

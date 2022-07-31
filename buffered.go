@@ -587,9 +587,10 @@ func NewBufferedPair(network string) (net.Conn, net.Conn, error) {
 // A BufferedListener is an in-memory Unix socket emulator that implements
 // the net.Listener interface.
 type BufferedListener struct {
-	ep      unix.Endpoint
-	network string
-	cancel  chan struct{}
+	ep         unix.Endpoint
+	network    string
+	cancelOnce sync.Once
+	cancel     chan struct{}
 }
 
 var _ net.Listener = (*BufferedListener)(nil)
@@ -620,11 +621,12 @@ func BufferedListen(network string, addr *net.UnixAddr) (*BufferedListener, erro
 		return nil, &net.OpError{Op: "listen", Net: network, Source: addr, Err: errors.New(err.String())}
 	}
 
-	return &BufferedListener{ep, network, make(chan struct{})}, nil
+	return &BufferedListener{ep: ep, network: network, cancel: make(chan struct{})}, nil
 }
 
 // Close implements net.Listener.Close.
 func (l *BufferedListener) Close() error {
+	l.Shutdown()
 	l.ep.Close(nil /* ctx */)
 	return nil
 }
@@ -632,7 +634,9 @@ func (l *BufferedListener) Close() error {
 // Shutdown stops the listener.
 func (l *BufferedListener) Shutdown() {
 	l.ep.Shutdown(tcpip.ShutdownWrite | tcpip.ShutdownRead)
-	close(l.cancel) // broadcast cancellation
+	l.cancelOnce.Do(func() {
+		close(l.cancel) // broadcast cancellation
+	})
 }
 
 // Addr implements net.Listener.Addr.

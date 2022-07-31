@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"sync"
 )
 
 type unbufferedPacketConn struct {
@@ -61,6 +62,7 @@ func (unbufferedAddr) String() string { return "unbuffered" }
 // Lighter weight, but not compatible with all applications. Creates unbuffered net.Conns.
 type Unbuffered struct {
 	acceptQueue chan net.Conn
+	cancelOnce  sync.Once
 	cancel      chan struct{}
 }
 
@@ -68,11 +70,16 @@ var _ net.Listener = (*Unbuffered)(nil)
 
 // NewUnbuffered creates a new unbuffered listener.
 func NewUnbuffered() *Unbuffered {
-	return &Unbuffered{make(chan net.Conn), make(chan struct{})}
+	return &Unbuffered{acceptQueue: make(chan net.Conn), cancel: make(chan struct{})}
 }
 
-// Dial creates a new unbuffered connection.
-func (u *Unbuffered) Dial(ctx context.Context) (net.Conn, error) {
+// Dial creates a new unbuffered connection with no timeout.
+func (u *Unbuffered) Dial() (net.Conn, error) {
+	return u.DialContext(context.Background())
+}
+
+// DialContext creates a new unbuffered connection with a context.
+func (u *Unbuffered) DialContext(ctx context.Context) (net.Conn, error) {
 	// Check for closure/cancellation first.
 	select {
 	case <-u.cancel:
@@ -100,7 +107,10 @@ func (u *Unbuffered) Dial(ctx context.Context) (net.Conn, error) {
 
 // Close implements net.Listener.Close.
 func (u *Unbuffered) Close() error {
-	close(u.cancel)
+	u.cancelOnce.Do(func() {
+		close(u.cancel)
+	})
+
 	return nil
 }
 
