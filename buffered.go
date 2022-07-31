@@ -379,7 +379,7 @@ func (c *BufferedStreamConn) newOpError(op string, err error) *net.OpError {
 }
 
 // A BufferedPacketConn is an in-memory Unix dgram/seqpacket socket emulator
-// that implements the net.Conn interface.
+// that implements the net.Conn and net.PacketConn interfaces.
 //
 // Effectively equivalent to the "unixgram" and "unixpacket" networks (SOCK_DGRAM and SOCK_SEQPACKET socket types respectively), message
 // boundaries are not preserved, but bytes are transferred reliably and in the
@@ -468,7 +468,7 @@ func (c *BufferedPacketConn) newRemoteOpError(op string, remote net.Addr, err er
 	}
 }
 
-// Read implements net.Conn.Read
+// Read implements net.Conn.Read.
 func (c *BufferedPacketConn) Read(b []byte) (int, error) {
 	bytesRead, _, err := c.ReadFrom(b)
 	return bytesRead, err
@@ -491,6 +491,7 @@ func (c *BufferedPacketConn) ReadFrom(b []byte) (int, net.Addr, error) {
 	}, nil
 }
 
+// Write implements net.Conn.Write.
 func (c *BufferedPacketConn) Write(b []byte) (int, error) {
 	deadline := c.writeCancel()
 

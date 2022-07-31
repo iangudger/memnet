@@ -42,6 +42,8 @@ func (c unbufferedPacketConn) WriteTo(b []byte, addr net.Addr) (int, error) {
 
 // NewUnbufferedPair creates a connected pair (socketpair) of unbuffered net.Conns.
 //
+// The returned values also implement net.PacketConn.
+//
 // The implementation is inherently message oriented due to the lack of buffering. For each WriteXxx call, there is one opportunity to read the written data. If the buffer provided to ReadXxx is smaller than the buffer provided to the corresponding WriteXxx call, the unreadable data will be silently discarded.
 func NewUnbufferedPair() (net.Conn, net.Conn) {
 	c1, c2 := net.Pipe()

@@ -5,7 +5,7 @@ Allows portable and hermetic testing and connecting. Useful for all cases where 
 Buffered types emulate Linux's version of Unix sockets and are based on [gVisor](https://gvisor.dev)'s [Unix socket implementation](https://cs.opensource.google/gvisor/gvisor/+/master:pkg/sentry/socket/unix/).
 
 ## Status
-- [x] Unbuffered packet socketpair
+- [x] Unbuffered packet (and stream) socketpair
 - [x] Unbuffered listener
 - [x] Buffered stream socketpair
 - [x] Buffered packet socketpair
